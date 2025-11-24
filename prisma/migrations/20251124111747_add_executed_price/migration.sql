@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "executedPrice" DOUBLE PRECISION,
+ADD COLUMN     "symbol" TEXT NOT NULL DEFAULT 'UNKNOWN';

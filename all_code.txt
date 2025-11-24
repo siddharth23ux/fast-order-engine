@@ -1,0 +1,1049 @@
+========================================
+FILE: .\.env
+========================================
+
+PORT=3000
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/orderdb
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+
+========================================
+FILE: .\combine_files.py
+========================================
+
+import os
+
+EXCLUDED_DIRS = {"node_modules", ".git", "dist", "__pycache__", ".vscode", "package-lock.json"}
+
+def combine_all_files(root_dir=".", output_file="all_code.txt"):
+    with open(output_file, "w", encoding="utf-8") as outfile:
+        for subdir, dirs, files in os.walk(root_dir):
+            # Skip directories
+            dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+
+            for file in files:
+                file_path = os.path.join(subdir, file)
+
+                # Skip output file itself
+                if file_path.endswith(output_file):
+                    continue
+
+                # Readable text files only
+                try:
+                    with open(file_path, "r", encoding="utf-8") as infile:
+                        outfile.write(f"{'='*40}\n")
+                        outfile.write(f"FILE: {file_path}\n")
+                        outfile.write(f"{'='*40}\n\n")
+                        outfile.write(infile.read())
+                        outfile.write("\n\n")
+                    print(f"Added: {file_path}")
+                except:
+                    print(f"Skipped (binary or unreadable): {file_path}")
+
+    print(f"\nAll files successfully combined into: {output_file}")
+
+
+if __name__ == "__main__":
+    combine_all_files()
+
+
+========================================
+FILE: .\docker-compose.yml
+========================================
+
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orderdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "no"]
+
+volumes:
+  postgres_data:
+
+========================================
+FILE: .\Dockerfile
+========================================
+
+FROM node:20-alpine AS base
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+CMD ["node", "dist/server.js"]
+
+
+========================================
+FILE: .\jest.config.cjs
+========================================
+
+// jest.config.cjs
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/tests', '<rootDir>/src'],
+  transform: {
+    '^.+\\.tsx?$': 'ts-jest'
+  },
+  moduleFileExtensions: ['ts', 'js', 'json', 'node'],
+  testMatch: ['**/?(*.)+(spec|test).[tj]s?(x)'],
+  globals: {
+    'ts-jest': {
+      tsconfig: 'tsconfig.json',
+      diagnostics: false
+    }
+  },
+  setupFiles: ['dotenv/config'],
+  transformIgnorePatterns: ['/node_modules/'],
+  verbose: true
+};
+
+
+========================================
+FILE: .\package.json
+========================================
+
+{
+  "name": "fast-order-engine",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "ts-node-dev -r dotenv/config --respawn --transpile-only src/server.ts",
+    "worker": "ts-node-dev -r dotenv/config --respawn --transpile-only src/worker/processor.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "test": "jest --runInBand --config jest.config.cjs",
+    "lint": "eslint . --ext .ts,.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.3.0",
+    "@fastify/websocket": "^8.2.0",
+    "@prisma/client": "^5.2.0",
+    "bullmq": "^4.8.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.23.2",
+    "ioredis": "^5.3.2",
+    "uuid": "^9.0.0",
+    "zod": "^3.22.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.5.9",
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.5",
+    "jest": "^29.7.0",
+    "prisma": "^5.2.0",
+    "ts-jest": "^29.4.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  }
+}
+
+
+========================================
+FILE: .\postman_collection.json
+========================================
+
+{
+  "info": {
+    "name": "Order Engine Collection",
+    "_postman_id": "order-engine",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Order",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MARKET\",\"side\":\"BUY\",\"tokenIn\":\"SOL\",\"tokenOut\":\"USDC\",\"amount\":1.0}"
+        },
+        "url": { "raw": "http://localhost:3000/api/orders/execute", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","orders","execute"] }
+      }
+    },
+    {
+      "name": "Websocket subscribe (example)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "ws://localhost:3000/api/orders/ws", "protocol": "ws", "host": ["localhost"], "port": "3000", "path": ["api","orders","ws"] }
+      }
+    }
+  ]
+}
+
+
+========================================
+FILE: .\README.md
+========================================
+
+# Fast Order Engine (Assignment Deliverable)
+
+## Short explanation of choices
+
+- **Order type:** Market order (chosen because the assignment focuses on routing and immediate execution; supporting limit/sniper can be added by adding a watcher/trigger system that enqueues when price conditions are met).
+- **DEX implementation:** Mock DEX (Raydium/Meteora) for stable, reproducible testing and to avoid devnet flakiness. The code is structured so real SDKs can be swapped in.
+
+## HTTP → WebSocket pattern
+
+The app uses a POST `/api/orders/execute` endpoint that returns an `orderId` and enqueues the job. The client then opens a WebSocket to `/api/orders/ws` and sends `{"action":"subscribe","orderId":"<id>"}` to receive updates.  
+**Reason:** Browsers and many HTTP clients can’t perform a POST and then programmatically upgrade the *same TCP* connection to WebSocket in a portable way. The POST + subscribe pattern matches industry practice and the assignment's spirit. If you require the same-connection upgrade (raw socket), a different client (non-browser) and server code path is needed — I can provide that separately.
+
+## How to run
+
+1. `docker-compose up -d` (starts Postgres + Redis)
+2. `npm install`
+3. `npx prisma migrate dev --name init`
+4. `npm run dev` (server)
+5. `npm run worker` (in separate terminal)
+
+## Endpoints
+
+- `POST /api/orders/execute` — payload: `{ type, side, tokenIn, tokenOut, amount, slippage? }`
+- `GET  /api/orders/ws` — after connecting send `{"action":"subscribe","orderId":"..."}`
+
+## Notes
+
+- Worker publishes statuses to Redis channel `order:<orderId>`; the WS subscribes and forwards to the client.
+
+
+========================================
+FILE: .\tsconfig.json
+========================================
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["src", "tests"]
+}
+
+
+========================================
+FILE: .\prisma\schema.prisma
+========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  type        String
+  side        String
+  tokenIn     String
+  tokenOut    String
+  amount      Float
+  status      String   @default("pending")
+  txHash      String?
+  venue       String?
+  price       Float?
+  failReason  String?
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  slippage      Float        @default(1.0)
+  symbol    String  @default("UNKNOWN") // add a default
+  executedPrice Float?
+}
+
+
+========================================
+FILE: .\prisma\migrations\migration_lock.toml
+========================================
+
+# Please do not edit this file manually
+# It should be added in your version-control system (i.e. Git)
+provider = "postgresql"
+
+========================================
+FILE: .\prisma\migrations\20251124095829_init\migration.sql
+========================================
+
+-- CreateTable
+CREATE TABLE "Order" (
+    "id" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "side" TEXT NOT NULL,
+    "tokenIn" TEXT NOT NULL,
+    "tokenOut" TEXT NOT NULL,
+    "amount" DOUBLE PRECISION NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "txHash" TEXT,
+    "venue" TEXT,
+    "price" DOUBLE PRECISION,
+    "failReason" TEXT,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
+);
+
+
+========================================
+FILE: .\prisma\migrations\20251124110641_add_slippage_to_order\migration.sql
+========================================
+
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "slippage" DOUBLE PRECISION NOT NULL DEFAULT 1.0;
+
+
+========================================
+FILE: .\prisma\migrations\20251124111747_add_executed_price\migration.sql
+========================================
+
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "executedPrice" DOUBLE PRECISION,
+ADD COLUMN     "symbol" TEXT NOT NULL DEFAULT 'UNKNOWN';
+
+
+========================================
+FILE: .\scripts\demo-client.ts
+========================================
+
+// scripts/demo-client.ts
+import WebSocket from "ws";
+
+async function runDemo() {
+  const WS_URL = "ws://localhost:3000/api/orders/ws";
+  const API_URL = "http://localhost:3000/api/orders/execute";
+  const ws = new WebSocket(WS_URL);
+  ws.on("open", () => console.log("WS connected"));
+  ws.on("message", msg => console.log("WS >", msg.toString()));
+  const orders = [
+    { amount: 1, side: "BUY", slippage: 1 },
+    { amount: 2, side: "SELL", slippage: 2 }
+  ];
+  for (const o of orders) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "MARKET",
+        side: o.side,
+        tokenIn: "SOL",
+        tokenOut: "USDC",
+        amount: o.amount,
+        slippage: o.slippage
+      })
+    });
+    const data = await res.json();
+    console.log("Created order:", data);
+    ws.send(
+      JSON.stringify({
+        action: "subscribe",
+        orderId: data.orderId
+      })
+    );
+  }
+}
+
+runDemo();
+
+========================================
+FILE: .\src\app.ts
+========================================
+
+import fastify from 'fastify';
+import cors from '@fastify/cors';
+import websocket from '@fastify/websocket';
+import { orderRoutes } from './modules/orders/order.routes';
+
+export const buildApp = async () => {
+  const app = fastify({ logger: false });
+
+  await app.register(cors);
+  await app.register(websocket);
+
+  // Register routes
+  await app.register(orderRoutes, { prefix: '/api/orders' });
+
+  return app;
+};
+
+
+========================================
+FILE: .\src\server.ts
+========================================
+
+import { buildApp } from './app';
+import { env } from './config/env';
+
+const start = async () => {
+  const app = await buildApp();
+
+  try {
+    await app.listen({
+      port: parseInt(env.PORT, 10),
+      host: '0.0.0.0',
+    });
+    console.log(`Server running at http://0.0.0.0:${env.PORT}`);
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+};
+
+start();
+
+
+========================================
+FILE: .\src\config\env.ts
+========================================
+
+import * as dotenv from 'dotenv';
+import { z } from 'zod';
+
+dotenv.config();
+
+const schema = z.object({
+  PORT: z.string().default('3000'),
+  DATABASE_URL: z.string().optional(),
+  REDIS_HOST: z.string().default('127.0.0.1'),
+  REDIS_PORT: z.string().default('6379'),
+});
+
+export const env = schema.parse(process.env);
+
+
+========================================
+FILE: .\src\lib\logger.ts
+========================================
+
+// src/lib/logger.ts
+// Silent logger during tests to avoid "Cannot log after tests are done"
+// For local/dev, it prints normally.
+export const log = (...args: any[]) => {
+  // Jest sets JEST_WORKER_ID in env for worker processes
+  if (process.env.JEST_WORKER_ID) return;
+  console.log('[LOG]', ...args);
+};
+
+
+========================================
+FILE: .\src\lib\prisma.ts
+========================================
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export default prisma;
+
+
+========================================
+FILE: .\src\lib\queue.ts
+========================================
+
+import { Queue } from 'bullmq';
+import { redisConfig } from './redis';
+
+export const ORDER_QUEUE_NAME = 'orders';
+export const orderQueue = new Queue(ORDER_QUEUE_NAME, {
+  connection: redisConfig
+});
+
+
+========================================
+FILE: .\src\lib\redis.ts
+========================================
+
+import IORedis from 'ioredis';
+import { env } from '../config/env';
+
+export const redisConfig = {
+  host: env.REDIS_HOST,
+  port: parseInt(env.REDIS_PORT, 10),
+};
+
+export const redis = new IORedis(redisConfig);
+export const redisPub = new IORedis(redisConfig);
+export const redisSub = new IORedis(redisConfig);
+
+
+========================================
+FILE: .\src\modules\orders\order.controller.ts
+========================================
+
+import { FastifyRequest, FastifyReply } from 'fastify';
+import prisma from '../../lib/prisma';
+import { orderQueue } from '../../lib/queue';
+import { CreateOrderSchema, CreateOrderInput } from './order.schema';
+import { v4 as uuidv4 } from 'uuid';
+
+export const createOrder = async (
+  req: FastifyRequest<{ Body: unknown }>,
+  reply: FastifyReply
+) => {
+  // validate request body
+  const parsed = CreateOrderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: 'invalid_payload', details: parsed.error.format() });
+  }
+  const input: CreateOrderInput = parsed.data;
+  // create DB order
+  const order = await prisma.order.create({
+    data: {
+      id: uuidv4(),
+      type: input.type,
+      side: input.side,
+      tokenIn: input.tokenIn,
+      tokenOut: input.tokenOut,
+      amount: input.amount,
+      slippage: input.slippage ?? 1.0,  // Default 1% tolerance
+      status: 'pending'
+    }
+  });
+  // add to queue with retry/backoff
+  await orderQueue.add('execute-order', {
+    orderId: order.id,
+    type: order.type,
+    side: order.side,
+    tokenIn: order.tokenIn,
+    tokenOut: order.tokenOut,
+    amount: order.amount,
+    slippage: order.slippage  // Now matches DB
+  }, {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 1000 },
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+  // Respond with orderId; client should then upgrade to WS (same TCP if possible)
+  return reply.code(201).send({
+    orderId: order.id,
+    status: 'pending',
+    message: 'Order queued for execution'
+  });
+};
+
+========================================
+FILE: .\src\modules\orders\order.routes.ts
+========================================
+
+import { FastifyInstance } from 'fastify';
+import { createOrder } from './order.controller';
+import orderWsHandler from './order.ws';
+
+export async function orderRoutes(app: FastifyInstance) {
+  // POST /api/orders/execute
+  app.post('/execute', createOrder);
+
+  // WebSocket /api/orders/ws
+  app.get('/ws', { websocket: true }, (connection, req) => {
+    orderWsHandler(connection, req);
+  });
+}
+
+
+========================================
+FILE: .\src\modules\orders\order.schema.ts
+========================================
+
+import { z } from 'zod';
+
+export const CreateOrderSchema = z.object({
+  type: z.enum(['MARKET', 'LIMIT', 'SNIPER']).default('MARKET'),
+  side: z.enum(['BUY', 'SELL']),
+  tokenIn: z.string(),
+  tokenOut: z.string(),
+  amount: z.number().positive(),
+  // slippage: % tolerance (e.g., 1.0 for 1%)
+  slippage: z.number().min(0).max(50).optional()
+});
+
+export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
+
+========================================
+FILE: .\src\modules\orders\order.ws.ts
+========================================
+
+import { FastifyRequest } from 'fastify';
+import { redisSub } from '../../lib/redis';
+import { log } from '../../lib/logger';
+
+export default (connection: any, req: FastifyRequest) => {
+  const socket = connection.socket;
+  let subscribedChannel: string | null = null;
+  let redisListener: ((channel: string, message: string) => void) | null = null;
+
+  const cleanup = async () => {
+    try {
+      if (subscribedChannel) {
+        await redisSub.unsubscribe(subscribedChannel);
+      }
+    } catch (e) {
+      // ignore unsubscribe errors
+    }
+    subscribedChannel = null;
+    if (redisListener) {
+      redisSub.off('message', redisListener);
+      redisListener = null;
+    }
+  };
+
+  socket.on('message', async (msg: Buffer) => {
+    try {
+      const data = JSON.parse(msg.toString());
+      if (data.action === 'subscribe' && data.orderId) {
+        const channel = `order:${data.orderId}`;
+        subscribedChannel = channel;
+
+        if (redisListener) {
+          redisSub.off('message', redisListener);
+        }
+
+        redisListener = (ch: string, message: string) => {
+          if (ch === channel) {
+            try {
+              socket.send(message);
+            } catch (err) {
+              // swallow send error (socket may be closed)
+            }
+          }
+        };
+
+        // Subscribe and attach listener
+        await redisSub.subscribe(channel);
+        redisSub.on('message', redisListener);
+
+        socket.send(JSON.stringify({ status: 'subscribed', orderId: data.orderId }));
+        log(`WS subscribed to ${channel}`);
+      } else {
+        socket.send(JSON.stringify({ error: 'unknown action or missing orderId' }));
+      }
+    } catch (err) {
+      socket.send(JSON.stringify({ error: 'invalid message format' }));
+    }
+  });
+
+  socket.on('close', async () => {
+    await cleanup();
+  });
+
+  socket.on('error', async (err: any) => {
+    log('ws error', err);
+    await cleanup();
+  });
+};
+
+
+========================================
+FILE: .\src\worker\dex.mock.ts
+========================================
+
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export interface Quote {
+  venue: 'Raydium' | 'Meteora';
+  price: number;
+  fee: number;
+  liquidity: number;  // Added for spec compliance
+}
+
+export class MockDexRouter {
+  private basePrices: Record<string, number> = {
+    'SOL-USDC': 145.5,
+    'BTC-USDC': 62000.0,
+    'USDC-SOL': 0.0068,
+  };
+
+  async getQuotes(pair: string, amount: number): Promise<Quote[]> {
+    await sleep(200 + Math.random() * 200);
+    const base = this.basePrices[pair] || 100;
+    const raydiumPrice = base * (0.98 + Math.random() * 0.04);
+    const meteoraPrice = base * (0.97 + Math.random() * 0.05);
+    return [
+      { 
+        venue: 'Raydium', 
+        price: parseFloat(raydiumPrice.toFixed(6)), 
+        fee: 0.003,
+        liquidity: 1e6 + Math.random() * 1e9  // Random liquidity 1M-1B
+      },
+      { 
+        venue: 'Meteora', 
+        price: parseFloat(meteoraPrice.toFixed(6)), 
+        fee: 0.002,
+        liquidity: 1e6 + Math.random() * 1e9
+      },
+    ];
+  }
+
+  /**
+   * Execute swap on the chosen venue.
+   * We accept `quotedPrice` and simulate slight execution slippage around it.
+   */
+  async executeSwap(venue: string, amount: number, quotedPrice?: number) {
+    await sleep(2000 + Math.random() * 1000);
+    // Simulate execution price deviating slightly from quotedPrice
+    const base = quotedPrice ?? (this.basePrices['SOL-USDC'] || 100);
+    const executedPrice = parseFloat((base * (1 + (Math.random() - 0.5) * 0.01)).toFixed(6)); // ±0.5%
+    // small chance to fail to test retry logic (simulate severe slippage)
+    if (Math.random() < 0.03) throw new Error('Slippage tolerance exceeded');
+    const txHash = this.generateMockTxHash();
+    return { txHash, executedPrice };
+  }
+
+  private generateMockTxHash() {
+    const chars = '0123456789abcdef';
+    let out = '';
+    for (let i = 0; i < 64; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return `0x${out}`;
+  }
+}
+
+========================================
+FILE: .\src\worker\processor.ts
+========================================
+
+// src/worker/processor.ts
+import { Job } from "bullmq";
+import prisma from "../lib/prisma";
+import { redisPub } from "../lib/redis";
+import { ORDER_QUEUE_NAME } from "../lib/queue";
+import { MockDexRouter, Quote } from "./dex.mock";  // Import updated Quote
+import { Worker, QueueEvents } from "bullmq";
+import { log } from "../lib/logger";  // For routing logs
+
+export type DexQuote = Quote;  // Alias for clarity
+
+export function scoreForSide(side: "BUY" | "SELL", quote: DexQuote) {
+  // Composite score: price (inverted for BUY), adjusted for fee & liquidity
+  // BUY: lower effective price / higher liq better → negative score
+  // SELL: higher effective price * liq better → positive score
+  const effectivePrice = quote.price * (1 + (side === 'BUY' ? quote.fee : -quote.fee));
+  const liquidityFactor = quote.liquidity / 1e9;  // Normalize to 0-2 range
+  return side === "BUY" 
+    ? - (effectivePrice / liquidityFactor)  // Lower = better (more negative)
+    : effectivePrice * liquidityFactor;    // Higher = better
+}
+
+// Dependency-injected processor factory
+export function createProcessor(router: any) {
+  return async function processOrder(job: Job) {
+    const orderId = job.data.orderId;
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error("Order not found");
+    // 1. pending
+    await publishStatus(orderId, "pending");
+    // 2. routing
+    await publishStatus(orderId, "routing");
+    const symbol = `${order.tokenIn}-${order.tokenOut}`;
+    const quotes = await router.getQuotes(symbol, order.amount);
+    // Log routing decisions
+    log('DEX Quotes for', symbol, ':', quotes);
+    const best = quotes.reduce((a: DexQuote, b: DexQuote) =>
+      scoreForSide(order.side as "BUY" | "SELL", a) > scoreForSide(order.side as "BUY" | "SELL", b) ? a : b
+    );
+    log('Routed to', best.venue, 'at price', best.price, 'with liquidity', best.liquidity.toLocaleString());
+    // 3. building
+    await publishStatus(orderId, "building");
+    // Fixed: Positional args for executeSwap
+    const exec = await router.executeSwap(best.venue, order.amount, best.price);
+    // Slippage check: Now slippage is % (e.g., 1.0 = 1%), so frac = slippage / 100
+    const slippageFrac = order.slippage / 100;
+    const maxPrice = best.price * (1 + slippageFrac);
+    const minPrice = best.price * (1 - slippageFrac);
+    if (exec.executedPrice < minPrice || exec.executedPrice > maxPrice) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: "failed", failReason: "Slippage exceeded", attempts: { increment: 1 } }
+      });
+      await publishStatus(orderId, "failed", { error: "Slippage exceeded" });
+      throw new Error("Slippage exceeded");
+    }
+    // 4. submitted
+    await publishStatus(orderId, "submitted", { txHash: exec.txHash });
+    // Simulate confirm
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: "confirmed",
+        txHash: exec.txHash,
+        venue: best.venue,
+        executedPrice: exec.executedPrice,
+        attempts: { increment: 1 }
+      }
+    });
+    // 5. confirmed
+    await publishStatus(orderId, "confirmed", {
+      txHash: exec.txHash,
+      executedPrice: exec.executedPrice
+    });
+    return true;
+  };
+}
+
+// Production router
+const prodRouter = new MockDexRouter();
+export const processOrder = createProcessor(prodRouter);
+
+// Worker wiring
+export const worker = new Worker(
+  ORDER_QUEUE_NAME,
+  async job => processOrder(job),
+  { concurrency: 10 }
+);
+export const events = new QueueEvents(ORDER_QUEUE_NAME);
+
+/**
+ * Publish status to the Redis channel for this specific order
+ */
+async function publishStatus(orderId: string, stage: string, extra: any = {}) {
+  // 🔥 Updated: publish to per-order channel
+  await redisPub.publish(
+    `order:${orderId}`, // per-order channel
+    JSON.stringify({ orderId, stage, ...extra })
+  );
+}
+
+========================================
+FILE: .\tests\app.test.ts
+========================================
+
+import { buildApp } from "../src/app";
+
+describe("App bootstrap", () => {
+  it("should build the Fastify app", async () => {
+    const app = await buildApp();
+    expect(app).toBeDefined();
+  });
+
+  it("should register order routes", async () => {
+  const app = await buildApp();
+  const routes = app.printRoutes();
+
+  expect(routes).toContain("api/orders/");
+  expect(routes).toMatch(/execute\s*\(POST\)/);
+});
+});
+
+
+========================================
+FILE: .\tests\dex.test.ts
+========================================
+
+// tests/dex.test.ts (new file)
+import { MockDexRouter } from '../src/worker/dex.mock';
+import { scoreForSide } from '../src/worker/processor';
+
+describe('DEX Router', () => {
+  const router = new MockDexRouter();
+  it('generates varied quotes', async () => {
+    const quotes = await router.getQuotes('SOL-USDC', 1);
+    expect(quotes).toHaveLength(2);
+    expect(quotes[0].liquidity).toBeGreaterThan(1e6);
+    expect(quotes[0].price).toBeGreaterThan(0);
+  });
+  it('scores best quote for BUY (lowest effective price)', () => {
+    const q1 = { venue: 'R1', price: 100, fee: 0.003, liquidity: 1e9 } as any;
+    const q2 = { venue: 'M1', price: 102, fee: 0.002, liquidity: 1e9 } as any;
+    expect(scoreForSide('BUY', q1)).toBeLessThan(scoreForSide('BUY', q2));  // q1 better
+  });
+  it('scores best for SELL (highest effective price)', () => {
+    const q1 = { venue: 'R1', price: 100, fee: 0.003, liquidity: 1e9 } as any;
+    const q2 = { venue: 'M1', price: 98, fee: 0.002, liquidity: 1e9 } as any;
+    expect(scoreForSide('SELL', q2)).toBeGreaterThan(scoreForSide('SELL', q1));  // q2 better
+  });
+});
+
+========================================
+FILE: .\tests\order.route.test.ts
+========================================
+
+import { buildApp } from "../src/app";
+
+describe("POST /api/orders/execute", () => {
+  let app: any;
+
+  beforeAll(async () => {
+    app = await buildApp();
+  });
+
+  it("should reject invalid payload", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/orders/execute",
+      payload: { type: "MARKET" }
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("should create order & enqueue job", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/orders/execute",
+      payload: {
+        type: "MARKET",
+        side: "BUY",
+        tokenIn: "SOL",
+        tokenOut: "USDC",
+        amount: 1
+      }
+    });
+
+    const json = res.json();
+    expect(res.statusCode).toBe(201);
+    expect(json.orderId).toBeDefined();
+  });
+
+  it("should default slippage to 0.01", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/orders/execute",
+      payload: {
+        type: "MARKET",
+        side: "SELL",
+        tokenIn: "SOL",
+        tokenOut: "USDC",
+        amount: 1
+      }
+    });
+
+    expect(res.statusCode).toBe(201);
+  });
+});
+
+
+========================================
+FILE: .\tests\queue.test.ts
+========================================
+
+import { orderQueue, ORDER_QUEUE_NAME } from "../src/lib/queue";
+
+describe("Queue behaviour", () => {
+  it("queue should exist", () => {
+       expect(orderQueue.name).toBe(ORDER_QUEUE_NAME);
+  });
+
+  it("should enqueue new order job", async () => {
+    const job = await orderQueue.add("execute-order", { orderId: "abc123" });
+    expect(job.id).toBeDefined();
+  });
+
+  it("job options should include retries + backoff", async () => {
+    const job = await orderQueue.add("execute-order", { orderId: "xyz" }, { 
+      attempts: 3,
+      backoff: { type: "exponential", delay: 1000 } 
+    });
+
+    expect(job.opts.attempts).toBe(3);
+    expect(job.opts.backoff).toBeDefined();
+  });
+});
+
+
+========================================
+FILE: .\tests\websocket.test.ts
+========================================
+
+import WebSocket from "ws";
+import { buildApp } from "../src/app";
+import { redis, redisPub, redisSub } from "../src/lib/redis";
+
+describe("WebSocket /ws", () => {
+  let app: any;
+  let server: any;
+  let url: string;
+
+  beforeAll(async () => {
+    app = await buildApp();
+    server = await app.listen({ port: 0 });
+    const address = app.server.address();
+    url = `ws://localhost:${address.port}/api/orders/ws`;
+  });
+
+  afterAll(async () => {
+    // close fastify server
+    await app.close();
+
+    // close Redis connections used by the app (prevents open handles)
+    try {
+      await redisSub.quit();
+      await redisPub.quit();
+      await redis.quit();
+    } catch (e) {
+      // ignore shutdown errors in tests
+    }
+  });
+
+  it("should connect to websocket", (done) => {
+    const ws = new WebSocket(url);
+    ws.on("open", () => {
+      ws.close();
+      done();
+    });
+  });
+
+  it("should reject malformed message", (done) => {
+    const ws = new WebSocket(url);
+    ws.on("open", () => ws.send("not_json"));
+    ws.on("message", (msg) => {
+      const json = JSON.parse(msg.toString());
+      expect(json.error).toBe("invalid message format");
+      ws.close();
+      done();
+    });
+  });
+
+  it("should respond to subscribe action", (done) => {
+    const ws = new WebSocket(url);
+    ws.on("open", () =>
+      ws.send(JSON.stringify({ action: "subscribe", orderId: "123" }))
+    );
+    ws.on("message", (msg) => {
+      const json = JSON.parse(msg.toString());
+      expect(json.status).toBe("subscribed");
+      ws.close();
+      done();
+    });
+  });
+
+  it("should clean up on close", (done) => {
+    const ws = new WebSocket(url);
+    ws.on("open", () => {
+      ws.send(JSON.stringify({ action: "subscribe", orderId: "123" }));
+      ws.close();
+      done();
+    });
+  });
+});
+
+

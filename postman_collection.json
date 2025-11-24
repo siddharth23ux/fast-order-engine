@@ -1,0 +1,29 @@
+{
+  "info": {
+    "name": "Order Engine Collection",
+    "_postman_id": "order-engine",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Order",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MARKET\",\"side\":\"BUY\",\"tokenIn\":\"SOL\",\"tokenOut\":\"USDC\",\"amount\":1.0}"
+        },
+        "url": { "raw": "http://localhost:3000/api/orders/execute", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","orders","execute"] }
+      }
+    },
+    {
+      "name": "Websocket subscribe (example)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "ws://localhost:3000/api/orders/ws", "protocol": "ws", "host": ["localhost"], "port": "3000", "path": ["api","orders","ws"] }
+      }
+    }
+  ]
+}

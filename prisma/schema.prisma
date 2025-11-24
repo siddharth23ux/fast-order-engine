@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  type        String
+  side        String
+  tokenIn     String
+  tokenOut    String
+  amount      Float
+  status      String   @default("pending")
+  txHash      String?
+  venue       String?
+  price       Float?
+  failReason  String?
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  slippage      Float        @default(1.0)
+  symbol    String  @default("UNKNOWN") // add a default
+  executedPrice Float?
+}

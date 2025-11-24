@@ -1,0 +1,39 @@
+{
+  "name": "fast-order-engine",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "ts-node-dev -r dotenv/config --respawn --transpile-only src/server.ts",
+    "worker": "ts-node-dev -r dotenv/config --respawn --transpile-only src/worker/processor.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "test": "jest --runInBand --config jest.config.cjs",
+    "lint": "eslint . --ext .ts,.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.3.0",
+    "@fastify/websocket": "^8.2.0",
+    "@prisma/client": "^5.2.0",
+    "bullmq": "^4.8.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.23.2",
+    "ioredis": "^5.3.2",
+    "uuid": "^9.0.0",
+    "zod": "^3.22.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.5.9",
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.5",
+    "jest": "^29.7.0",
+    "prisma": "^5.2.0",
+    "ts-jest": "^29.4.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  }
+}

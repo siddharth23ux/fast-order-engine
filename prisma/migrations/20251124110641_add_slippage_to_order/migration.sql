@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "slippage" DOUBLE PRECISION NOT NULL DEFAULT 1.0;
