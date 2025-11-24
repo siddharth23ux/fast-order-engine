@@ -1,19 +1,22 @@
-import { buildApp } from './app';
-import { env } from './config/env';
+import { buildApp } from "./app";
+import { env } from "./config/env";
 
-const start = async () => {
-  const app = await buildApp();
-
+const startServer = async () => {
   try {
+    const app = await buildApp();
+
+    const PORT = Number(env.PORT) || Number(process.env.PORT) || 3000;
+
     await app.listen({
-      port: parseInt(env.PORT, 10),
-      host: '0.0.0.0',
+      port: PORT,
+      host: "0.0.0.0", // REQUIRED for Railway/Render/Cyclic/Fly
     });
-    console.log(`Server running at http://0.0.0.0:${env.PORT}`);
-  } catch (err) {
-    console.error(err);
+
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  } catch (error) {
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 };
 
-start();
+startServer();
